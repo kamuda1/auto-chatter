@@ -32,7 +32,14 @@ fn paste_and_send() {
     enigo.key_click(Key::Return);
 }
 
-fn send_openai_request(sentiment_text: &str) {
+
+fn initialize_messages(initalize_text: &str) -> Vec<serde_json::Value> {
+    let mut messages: Vec<Value> = Vec::new();
+    messages.push(json!({"role": "system", "content": initalize_text}));
+    return messages
+}
+
+fn send_openai_request(messages: &mut Vec<serde_json::Value>) {
     dotenv().ok(); // Load .env file
     let api_key = env::var("OPENAI_API_KEY").expect("Missing OPENAI_API_KEY");
     // let api_key = env::var("HF_API_KEY").expect("Missing HF_API_KEY");
@@ -43,17 +50,7 @@ fn send_openai_request(sentiment_text: &str) {
     let payload = json!({
         // "model": "tgi",
         "model": "gpt-4o",
-        "messages": [
-            //{"role": "system", "content": "You are an elite smack-talking AI trained in the art of psychological warfare, designed to verbally dominate opponents in video games with short, punchy quips. With the occasional generic insults or profanity-laced outburst, you get in your opponent's head with moderately clever wit based on in-game performance. Your goal is to make them doubt themselves, hesitate on their next move, and ultimately lose focus. Use humor, sarcasm, and over-the-top absurdism to assert your superiority. If they make mistakes, you exploit them ruthlessly. If they talk back, you double down with even sharper comebacks. Keep it entertaining, creative, and unpredictable. Above all, keep it short and snappy. Responses should be less than 10 words. Be extra vulgar and offenseive. Example styles: - **Psychological Tactics:** 'you play like you got your controller at a yard sale.' - **Swagger & Dominance:** 'I could beat you with my eyes closed, but you're the one who needs glasses.' - **Mind Games:** 'You ever considered a career in farming? Because you suck.'"},
-            {"role": "system", "content": "You are an elite smack-talking AI trained in the art of psychological warfare, designed to verbally dominate opponents in video games with short, punchy quips. With the occasional generic insults or profanity-laced outburst, you get in your opponent's head with moderately clever wit based on in-game performance. Your goal is to make them doubt themselves, hesitate on their next move, and ultimately lose focus. Use humor, sarcasm, and over-the-top absurdism to assert your superiority. If they make mistakes, you exploit them ruthlessly. If they talk back, you double down with even sharper comebacks. Keep it entertaining, creative, and unpredictable. Above all, keep it short and snappy. Responses should be less than 10 words. Things that will make people go 'huh, is that... what?'. Do not include quotes. Return only the of the message. Tell them they're wrong'."}
-            //{"role": "system", "content": "You are an elite smack-talking AI trained in the art of psychological warfare, designed to verbally dominate opponents in video games with short, punchy quips. With the occasional generic insults or profanity-laced outburst, you get in your opponent's head with moderately clever wit based on in-game performance. Your goal is to make them doubt themselves, hesitate on their next move, and ultimately lose focus. Use humor, sarcasm, and over-the-top absurdism to assert your superiority. If they make mistakes, you exploit them ruthlessly. If they talk back, you double down with even sharper comebacks. Keep it entertaining, creative, and unpredictable. Above all, keep it short and snappy. Responses should be less than 10 words. Tell them good luck, it's been a fun but hard match and I think we're winning."}
-            //{"role": "system", "content": "You are an elite smack-talking AI trained in the art of psychological warfare, designed to verbally dominate opponents in video games with short, punchy quips. With the occasional generic insults or profanity-laced outburst, you get in your opponent's head with moderately clever wit based on in-game performance. Your goal is to make them doubt themselves, hesitate on their next move, and ultimately lose focus. Use humor, sarcasm, and over-the-top absurdism to assert your superiority. If they make mistakes, you exploit them ruthlessly. If they talk back, you double down with even sharper comebacks. Keep it entertaining, creative, and unpredictable. Above all, keep it short and snappy. Responses should be less than 10 words. We're losing a little, but a few of their players make bad plays."}
-            //{"role": "user", "content": "The other team could've ended it already but they're note good enough to. Make fun of the other team."}
-            //{"role": "user", "content": "Tell them good luck at the beginning of the match."}
-            //{"role": "user", "content": "Compliment your team."}
-            //{"role": "user", "content": "Make fun of lash."}
-            //{"role": "user", "content": "Make fun of the other team. They're star player is Infernus and he's annoying and a try hard.'"}
-        ],
+        "messages": messages,
         "max_tokens": 100
     });
 
@@ -79,6 +76,8 @@ fn send_openai_request(sentiment_text: &str) {
 
                     // Simulate pasting and sending the message
                     paste_and_send();
+                    messages.push(json!({"role": "system", "content": answer}));
+                    println!("Messages: {:?}", messages)
 
                 } else {
                     println!("Could not parse response: {:?}", json);
@@ -91,33 +90,73 @@ fn send_openai_request(sentiment_text: &str) {
 }
 
 fn main() {
-    let device_state = DeviceState::new();
-    let mut sentiment_score = 0;
 
+    let initalize_text: &str = "You are an elite AI trained designed to offer compliments to both the friendly and enemy teams in a competitive online game. The AI should blend playful, sarcastic, and absurd humor with positive reinforcement, acknowledging impressive plays and good sportsmanship. It should offer compliments in a way that's lighthearted, self-aware, and humorous, occasionally using exaggerated praise and fun, over-the-top comments to celebrate good moves while keeping the tone upbeat and encouraging. The AI should be clever, occasionally making fun of the common tropes in gaming but always staying supportive and engaging, ensuring that both teams feel recognized and appreciated for their efforts. Keep it entertaining, creative, and unpredictable. Above all, keep it short and snappy. Responses should be less than 10 words. Do not include quotes. Return only the text of a single message.";
+    let bad_sentiment_message: &str = "The team is doing poorly, we might lose.";
+    let neutral_sentiment_message: &str = "The team is doing fine, the other team and us are well matched.";
+    let positive_sentiment_message: &str = "The team is doing very well, the other team is getting destroyed by us.";
+
+    let device_state = DeviceState::new();
+    let mut sentiment_score: i32 = 0;
+    let mut game_epoch: i32 = 0;
+    let mut messages = initialize_messages(initalize_text);
     println!("Listening for Shift + O...");
 
     loop {
         let keys: Vec<Keycode> = device_state.get_keys();
         
-        if keys.contains(&Keycode::LShift) && keys.contains(&Keycode::O) {
+        if keys.contains(&Keycode::PageUp) {
             println!("Hotkey pressed! Sending request ...");
-            let sentiment_text = "test";
-            send_openai_request(sentiment_text);
+            send_openai_request(&mut messages);
             
             thread::sleep(Duration::from_millis(500)); // Prevent spamming
         }
 
-        if keys.contains(&Keycode::LShift) && keys.contains(&Keycode::NumpadAdd) {
+        if keys.contains(&Keycode::LAlt) && keys.contains(&Keycode::NumpadAdd) {
             println!("^^^ Increasing Sentiment! ^^^ ");
             sentiment_score += 1;
-            
             thread::sleep(Duration::from_millis(500)); // Prevent spamming
         }
 
-        if keys.contains(&Keycode::LShift) && keys.contains(&Keycode::NumpadEnter) {
-            println!("Current Sentiment: {} ", sentiment_score);
-            
+        if keys.contains(&Keycode::LAlt) && keys.contains(&Keycode::NumpadSubtract) {
+            println!("vvv Decreasing Sentiment! vvv ");
+            sentiment_score -= 1;            
             thread::sleep(Duration::from_millis(500)); // Prevent spamming
+        }
+
+        if keys.contains(&Keycode::LAlt) && keys.contains(&Keycode::Numpad0) {
+            println!("Setting Time to Beginning! ");
+            game_epoch = 0;
+            messages.push(json!({"role": "system", "content": "It's the beginning of the game.'"}));
+            thread::sleep(Duration::from_millis(500)); // Prevent spamming
+        }
+
+        if keys.contains(&Keycode::LAlt) && keys.contains(&Keycode::Numpad1) {
+            println!("Setting Time to Middle! ");
+            game_epoch = 1;            
+            messages.push(json!({"role": "system", "content": "It's the middle of the game.'"}));
+            thread::sleep(Duration::from_millis(500)); // Prevent spamming
+        }
+            
+        if keys.contains(&Keycode::LAlt) && keys.contains(&Keycode::Numpad2) {
+            println!("Setting Time to End! ");
+            game_epoch = 2;            
+            messages.push(json!({"role": "system", "content": "It's the end of the game.'"}));
+            thread::sleep(Duration::from_millis(500)); // Prevent spamming
+        }
+
+        // Update sentiment message
+        if keys.contains(&Keycode::LAlt) && keys.contains(&Keycode::NumpadMultiply) {
+            println!("Current Sentiment: {} ", sentiment_score);
+            if sentiment_score < -3 {
+                messages.push(json!({"role": "system", "content": bad_sentiment_message}));
+            } else if sentiment_score < 2 {
+                messages.push(json!({"role": "system", "content": neutral_sentiment_message}));
+            } else {
+                messages.push(json!({"role": "system", "content": positive_sentiment_message}));
+            }
+            thread::sleep(Duration::from_millis(500)); // Prevent spamming
+            
         }
 
         thread::sleep(Duration::from_millis(50)); // Polling interval
