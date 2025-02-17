@@ -32,7 +32,7 @@ fn paste_and_send() {
     enigo.key_click(Key::Return);
 }
 
-fn send_openai_request() {
+fn send_openai_request(sentiment_text: &str) {
     dotenv().ok(); // Load .env file
     let api_key = env::var("OPENAI_API_KEY").expect("Missing OPENAI_API_KEY");
     // let api_key = env::var("HF_API_KEY").expect("Missing HF_API_KEY");
@@ -92,6 +92,8 @@ fn send_openai_request() {
 
 fn main() {
     let device_state = DeviceState::new();
+    let mut sentiment_score = 0;
+
     println!("Listening for Shift + O...");
 
     loop {
@@ -99,7 +101,21 @@ fn main() {
         
         if keys.contains(&Keycode::LShift) && keys.contains(&Keycode::O) {
             println!("Hotkey pressed! Sending request ...");
-            send_openai_request();
+            let sentiment_text = "test";
+            send_openai_request(sentiment_text);
+            
+            thread::sleep(Duration::from_millis(500)); // Prevent spamming
+        }
+
+        if keys.contains(&Keycode::LShift) && keys.contains(&Keycode::NumpadAdd) {
+            println!("^^^ Increasing Sentiment! ^^^ ");
+            sentiment_score += 1;
+            
+            thread::sleep(Duration::from_millis(500)); // Prevent spamming
+        }
+
+        if keys.contains(&Keycode::LShift) && keys.contains(&Keycode::NumpadEnter) {
+            println!("Current Sentiment: {} ", sentiment_score);
             
             thread::sleep(Duration::from_millis(500)); // Prevent spamming
         }
